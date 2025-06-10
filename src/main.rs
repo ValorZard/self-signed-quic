@@ -8,9 +8,10 @@ use std::{
     sync::Arc,
 };
 
+use bytes::Bytes;
 use clap::{arg, Parser, Subcommand};
 use quinn_proto::crypto::rustls::QuicClientConfig;
-use quinn::{rustls::{self, pki_types::PrivatePkcs8KeyDer}, ClientConfig, Endpoint, ServerConfig};
+use quinn::{rustls::{self, pki_types::PrivatePkcs8KeyDer}, ClientConfig, Endpoint, ServerConfig, VarInt};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 
 pub fn make_server_endpoint(
@@ -76,6 +77,17 @@ async fn run_server(addr: SocketAddr) {
         "[server] connection accepted: addr={}",
         conn.remote_address()
     );
+    let (mut send_stream, recv_stream) = conn.open_bi().await.unwrap();
+    println!("[server] opened bidirectional stream");
+    send_stream
+        .write_all(b"Hello from QUIC server!")
+        .await
+        .unwrap();
+    println!("[server] closing connection");
+    send_stream
+        .write_all(b"quit")
+        .await
+        .unwrap();
 }
 
 async fn run_client(server_addr: SocketAddr) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -95,6 +107,18 @@ async fn run_client(server_addr: SocketAddr) -> Result<(), Box<dyn Error + Send 
         .await
         .unwrap();
     println!("[client] connected: addr={}", connection.remote_address());
+    // receive a datagram
+    let (send_stream, mut recv_stream) = connection.accept_bi().await.unwrap();
+    
+    while let Some(data) = recv_stream.read_chunk(1024, true).await? {
+        let message = String::from_utf8_lossy(&data.bytes);
+        println!("[client] received: {}", message);
+        if message == "quit" {
+            println!("[client] quitting");
+            break;
+        }
+    }
+
     // Dropping handles allows the corresponding objects to automatically shut down
     drop(connection);
     // Make sure the server has a chance to clean up

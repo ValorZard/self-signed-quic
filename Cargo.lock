@@ -748,6 +748,7 @@ dependencies = [
 name = "self-signed-quic"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "clap",
  "quinn",
  "quinn-proto",
