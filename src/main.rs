@@ -48,17 +48,20 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     Server,
-    Client,
+    Client {
+        #[arg(long)]
+        server_address: String,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-    // run by doing either "cargo run --  server" or "cargo run -- client"
+    // run by doing either "cargo run --  server" or "cargo run client --server-address <SERVER_ADDRESS>"
     let cli = Cli::parse();
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
     match cli.command {
         Commands::Server => run_server(addr).await,
-        Commands::Client => run_client(addr).await?,
+        Commands::Client{server_address} => run_client(server_address.parse().expect("Unable to parse address")).await?,
     }
     Ok(())
 }
