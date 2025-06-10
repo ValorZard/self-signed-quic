@@ -8,6 +8,7 @@ use std::{
     sync::Arc,
 };
 
+use clap::{arg, Parser, Subcommand};
 use quinn_proto::crypto::rustls::QuicClientConfig;
 use quinn::{rustls::{self, pki_types::PrivatePkcs8KeyDer}, ClientConfig, Endpoint, ServerConfig};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
@@ -38,12 +39,27 @@ fn configure_server()
 #[allow(unused)]
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
 
+#[derive(Debug, Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    Server,
+    Client,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-    // server and client are running on the same thread asynchronously
+    // run by doing either "cargo run --  server" or "cargo run -- client"
+    let cli = Cli::parse();
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
-    tokio::spawn(run_server(addr));
-    run_client(addr).await?;
+    match cli.command {
+        Commands::Server => run_server(addr).await,
+        Commands::Client => run_client(addr).await?,
+    }
     Ok(())
 }
 
